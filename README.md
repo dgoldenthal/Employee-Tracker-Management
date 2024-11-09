@@ -32,6 +32,12 @@ built with Node.js, Inquirer, and PostgreSQL.
   Start the application: node index.js
   Follow the interactive prompts to manage your employee database.
 
+
+# Video Walkthrough
+
+Click here to view the application walkthrough -
+
+
 # Dependencies
 
 * Node.js
