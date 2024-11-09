@@ -17,12 +17,15 @@ built with Node.js, Inquirer, and PostgreSQL.
 1. Clone the repository
 2. Install dependencies:  npm install
 3. Create PostgreSQL database:
+
       psql -U postgres
+
       CREATE DATABASE employee_db;
 
 4. Run schema and seeds:
 
       psql -U postgres -d employee_db -f schema.sql
+
       psql -U postgres -d employee_db -f seeds.sql
 
 5. Update database configuration in db/index.js with your PostgreSQL credentials
