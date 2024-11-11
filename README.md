@@ -3,16 +3,6 @@
 A command-line application to manage a company's employee database,
 built with Node.js, Inquirer, and PostgreSQL.
 
-# Table of Contents
-
-  • Features
-  • Installation
-  • Usage
-  • Database Schema
-  • Application Demo
-  • Technologies Used
-  • Error Handling
-
 # Features
 
 * View all departments, roles, and employees
@@ -25,10 +15,15 @@ built with Node.js, Inquirer, and PostgreSQL.
 # Error Handling
 
   • Prevents deletion of departments with existing roles
+
   • Prevents deletion of roles with existing employees
+
   • Validates duplicate department names
+
   • Validates salary inputs
+
   • Handles database connection errors
+
   • Color-coded error messages
 
 
