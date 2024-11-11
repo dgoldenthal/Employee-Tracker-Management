@@ -5,10 +5,11 @@ require('console.table');
 // All viewing functions
 async function viewDepartments() {
     try {
-        const result = await pool.query('SELECT * FROM department');
+        const result = await pool.query('SELECT * FROM department ORDER BY name');
+        console.log('\n');
         console.table(result.rows);
     } catch (err) {
-        console.error('Error viewing departments:', err);
+        console.error('\x1b[31m', 'Error viewing departments:', err.message, '\x1b[0m');
     }
 }
 
@@ -18,10 +19,12 @@ async function viewRoles() {
             SELECT r.id, r.title, d.name AS department, r.salary 
             FROM role r 
             JOIN department d ON r.department_id = d.id
+            ORDER BY r.title
         `);
+        console.log('\n');
         console.table(result.rows);
     } catch (err) {
-        console.error('Error viewing roles:', err);
+        console.error('\x1b[31m', 'Error viewing roles:', err.message, '\x1b[0m');
     }
 }
 
@@ -40,14 +43,15 @@ async function viewEmployees() {
             LEFT JOIN role r ON e.role_id = r.id
             LEFT JOIN department d ON r.department_id = d.id
             LEFT JOIN employee m ON e.manager_id = m.id
+            ORDER BY e.last_name, e.first_name
         `);
+        console.log('\n');
         console.table(result.rows);
     } catch (err) {
-        console.error('Error viewing employees:', err);
+        console.error('\x1b[31m', 'Error viewing employees:', err.message, '\x1b[0m');
     }
 }
 
-// New viewing functions
 async function viewEmployeesByManager() {
     try {
         const managers = await pool.query(`
@@ -56,10 +60,11 @@ async function viewEmployeesByManager() {
                 CONCAT(m.first_name, ' ', m.last_name) AS name
             FROM employee e
             JOIN employee m ON e.manager_id = m.id
+            ORDER BY name
         `);
 
         if (managers.rows.length === 0) {
-            console.log('No managers found in the system.');
+            console.log('\x1b[33m', 'No managers found in the system.', '\x1b[0m');
             return;
         }
 
@@ -85,18 +90,25 @@ async function viewEmployeesByManager() {
             JOIN role r ON e.role_id = r.id
             JOIN department d ON r.department_id = d.id
             WHERE e.manager_id = $1
+            ORDER BY e.last_name, e.first_name
         `, [managerId]);
 
+        console.log('\n');
         console.table(result.rows);
     } catch (err) {
-        console.error('Error viewing employees by manager:', err);
+        console.error('\x1b[31m', 'Error viewing employees by manager:', err.message, '\x1b[0m');
     }
 }
 
 async function viewEmployeesByDepartment() {
     try {
-        const departments = await pool.query('SELECT * FROM department');
+        const departments = await pool.query('SELECT * FROM department ORDER BY name');
         
+        if (departments.rows.length === 0) {
+            console.log('\x1b[33m', 'No departments exist in the system.', '\x1b[0m');
+            return;
+        }
+
         const { departmentId } = await inquirer.prompt([
             {
                 type: 'list',
@@ -119,18 +131,29 @@ async function viewEmployeesByDepartment() {
             JOIN role r ON e.role_id = r.id
             LEFT JOIN employee m ON e.manager_id = m.id
             WHERE r.department_id = $1
+            ORDER BY e.last_name, e.first_name
         `, [departmentId]);
 
-        console.table(result.rows);
+        console.log('\n');
+        if (result.rows.length === 0) {
+            console.log('\x1b[33m', 'No employees found in this department.', '\x1b[0m');
+        } else {
+            console.table(result.rows);
+        }
     } catch (err) {
-        console.error('Error viewing employees by department:', err);
+        console.error('\x1b[31m', 'Error viewing employees by department:', err.message, '\x1b[0m');
     }
 }
 
 async function viewDepartmentBudget() {
     try {
-        const departments = await pool.query('SELECT * FROM department');
+        const departments = await pool.query('SELECT * FROM department ORDER BY name');
         
+        if (departments.rows.length === 0) {
+            console.log('\x1b[33m', 'No departments exist in the system.', '\x1b[0m');
+            return;
+        }
+
         const { departmentId } = await inquirer.prompt([
             {
                 type: 'list',
@@ -155,13 +178,14 @@ async function viewDepartmentBudget() {
             GROUP BY d.name
         `, [departmentId]);
 
+        console.log('\n');
         console.table(result.rows);
     } catch (err) {
-        console.error('Error viewing department budget:', err);
+        console.error('\x1b[31m', 'Error viewing department budget:', err.message, '\x1b[0m');
     }
 }
 
-// All adding functions
+// Enhanced adding functions
 async function addDepartment() {
     try {
         const { name } = await inquirer.prompt([
@@ -169,33 +193,79 @@ async function addDepartment() {
                 type: 'input',
                 name: 'name',
                 message: 'What is the name of the department?',
-                validate: input => input.length > 0 || 'Department name cannot be empty'
+                validate: input => {
+                    if (!input.trim()) {
+                        return 'Department name cannot be empty';
+                    }
+                    return true;
+                }
             }
         ]);
 
-        await pool.query('INSERT INTO department (name) VALUES ($1)', [name]);
-        console.log(`Added ${name} department`);
+        // Check if department name already exists
+        const existingDept = await pool.query(
+            'SELECT * FROM department WHERE LOWER(name) = LOWER($1)',
+            [name.trim()]
+        );
+
+        if (existingDept.rows.length > 0) {
+            console.log('\x1b[31m', `Error: Department '${name}' already exists!`, '\x1b[0m');
+            return;
+        }
+
+        await pool.query('INSERT INTO department (name) VALUES ($1)', [name.trim()]);
+        console.log('\x1b[32m', `Successfully added department: ${name}`, '\x1b[0m');
     } catch (err) {
-        console.error('Error adding department:', err);
+        console.error('\x1b[31m', 'Error adding department:', err.message, '\x1b[0m');
     }
 }
 
 async function addRole() {
     try {
-        const departments = await pool.query('SELECT * FROM department');
+        const departments = await pool.query('SELECT * FROM department ORDER BY name');
         
+        if (departments.rows.length === 0) {
+            console.log('\x1b[31m', 'Error: No departments exist. Please create a department first.', '\x1b[0m');
+            return;
+        }
+
         const { title, salary, departmentId } = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'title',
                 message: 'What is the title of the role?',
-                validate: input => input.length > 0 || 'Role title cannot be empty'
+                validate: async (input) => {
+                    if (!input.trim()) {
+                        return 'Role title cannot be empty';
+                    }
+                    // Check if role title already exists
+                    const existingRole = await pool.query(
+                        'SELECT * FROM role WHERE LOWER(title) = LOWER($1)',
+                        [input.trim()]
+                    );
+                    if (existingRole.rows.length > 0) {
+                        return `Role '${input}' already exists!`;
+                    }
+                    return true;
+                }
             },
             {
-                type: 'number',
+                type: 'input',
                 name: 'salary',
                 message: 'What is the salary for this role?',
-                validate: input => !isNaN(input) || 'Please enter a valid number'
+                validate: input => {
+                    const salary = parseFloat(input);
+                    if (isNaN(salary)) {
+                        return 'Please enter a valid number';
+                    }
+                    if (salary < 0) {
+                        return 'Salary cannot be negative';
+                    }
+                    if (salary > 1000000000) {
+                        return 'Salary value is too high';
+                    }
+                    return true;
+                }
             },
             {
                 type: 'list',
@@ -210,31 +280,47 @@ async function addRole() {
 
         await pool.query(
             'INSERT INTO role (title, salary, department_id) VALUES ($1, $2, $3)',
-            [title, salary, departmentId]
+            [title.trim(), parseFloat(salary), departmentId]
         );
-        console.log(`Added ${title} role`);
+        console.log('\x1b[32m', `Successfully added role: ${title} with salary: $${salary}`, '\x1b[0m');
     } catch (err) {
-        console.error('Error adding role:', err);
+        console.error('\x1b[31m', 'Error adding role:', err.message, '\x1b[0m');
     }
 }
 
 async function addEmployee() {
     try {
-        const roles = await pool.query('SELECT * FROM role');
-        const employees = await pool.query('SELECT * FROM employee');
+        const roles = await pool.query('SELECT * FROM role ORDER BY title');
+        
+        if (roles.rows.length === 0) {
+            console.log('\x1b[31m', 'Error: No roles exist. Please create a role first.', '\x1b[0m');
+            return;
+        }
+
+        const employees = await pool.query(`
+            SELECT id, CONCAT(first_name, ' ', last_name) AS name 
+            FROM employee 
+            ORDER BY name
+        `);
 
         const { firstName, lastName, roleId, managerId } = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'firstName',
                 message: "What is the employee's first name?",
-                validate: input => input.length > 0 || 'First name cannot be empty'
+                validate: input => {
+                    if (!input.trim()) return 'First name cannot be empty';
+                    return true;
+                }
             },
             {
                 type: 'input',
                 name: 'lastName',
                 message: "What is the employee's last name?",
-                validate: input => input.length > 0 || 'Last name cannot be empty'
+                validate: input => {
+                    if (!input.trim()) return 'Last name cannot be empty';
+                    return true;
+                }
             },
             {
                 type: 'list',
@@ -252,7 +338,7 @@ async function addEmployee() {
                 choices: [
                     { name: 'None', value: null },
                     ...employees.rows.map(emp => ({
-                        name: `${emp.first_name} ${emp.last_name}`,
+                        name: emp.name,
                         value: emp.id
                     }))
                 ]
@@ -261,19 +347,30 @@ async function addEmployee() {
 
         await pool.query(
             'INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)',
-            [firstName, lastName, roleId, managerId]
+            [firstName.trim(), lastName.trim(), roleId, managerId]
         );
-        console.log(`Added ${firstName} ${lastName} as a new employee`);
+        console.log('\x1b[32m', `Successfully added employee: ${firstName} ${lastName}`, '\x1b[0m');
     } catch (err) {
-        console.error('Error adding employee:', err);
+        console.error('\x1b[31m', 'Error adding employee:', err.message, '\x1b[0m');
     }
 }
 
-// All update functions
+// Enhanced update functions
 async function updateEmployeeRole() {
     try {
-        const employees = await pool.query('SELECT * FROM employee');
-        const roles = await pool.query('SELECT * FROM role');
+        const employees = await pool.query(`
+            SELECT e.id, CONCAT(e.first_name, ' ', e.last_name) AS name, r.title
+            FROM employee e
+            JOIN role r ON e.role_id = r.id
+            ORDER BY name
+        `);
+
+        if (employees.rows.length === 0) {
+            console.log('\x1b[33m', 'No employees exist to update.', '\x1b[0m');
+            return;
+        }
+
+        const roles = await pool.query('SELECT * FROM role ORDER BY title');
 
         const { employeeId, roleId } = await inquirer.prompt([
             {
@@ -281,7 +378,7 @@ async function updateEmployeeRole() {
                 name: 'employeeId',
                 message: "Which employee's role do you want to update?",
                 choices: employees.rows.map(emp => ({
-                    name: `${emp.first_name} ${emp.last_name}`,
+                    name: `${emp.name} (Current Role: ${emp.title})`,
                     value: emp.id
                 }))
             },
@@ -300,46 +397,51 @@ async function updateEmployeeRole() {
             'UPDATE employee SET role_id = $1 WHERE id = $2',
             [roleId, employeeId]
         );
-        console.log('Updated employee role successfully');
+        console.log('\x1b[32m', 'Successfully updated employee role', '\x1b[0m');
     } catch (err) {
-        console.error('Error updating employee role:', err);
+        console.error('\x1b[31m', 'Error updating employee role:', err.message, '\x1b[0m');
     }
 }
 
 async function updateEmployeeManager() {
     try {
-        // First get all employees
         const employees = await pool.query(`
-            SELECT id, first_name, last_name 
-            FROM employee 
-            ORDER BY first_name, last_name
+            SELECT 
+                e.id, 
+                CONCAT(e.first_name, ' ', e.last_name) AS name,
+                CONCAT(m.first_name, ' ', m.last_name) AS current_manager
+            FROM employee e
+            LEFT JOIN employee m ON e.manager_id = m.id
+            ORDER BY e.first_name, e.last_name
         `);
 
-        // First prompt to select the employee
+        if (employees.rows.length === 0) {
+            console.log('\x1b[33m', 'No employees exist to update.', '\x1b[0m');
+            return;
+        }
+
         const { employeeId } = await inquirer.prompt([
             {
                 type: 'list',
                 name: 'employeeId',
                 message: "Which employee's manager do you want to update?",
                 choices: employees.rows.map(emp => ({
-                    name: `${emp.first_name} ${emp.last_name}`,
+                    name: `${emp.name} (Current Manager: ${emp.current_manager || 'None'})`,
                     value: emp.id
                 }))
             }
         ]);
 
-        // Then create manager choices excluding the selected employee
         const managerChoices = [
             { name: 'None', value: null },
             ...employees.rows
                 .filter(emp => emp.id !== employeeId)
                 .map(emp => ({
-                    name: `${emp.first_name} ${emp.last_name}`,
+                    name: emp.name,
                     value: emp.id
                 }))
         ];
 
-        // Second prompt to select the new manager
         const { managerId } = await inquirer.prompt([
             {
                 type: 'list',
@@ -349,23 +451,26 @@ async function updateEmployeeManager() {
             }
         ]);
 
-        // Update the database
         await pool.query(
             'UPDATE employee SET manager_id = $1 WHERE id = $2',
             [managerId, employeeId]
         );
-
-        console.log('Updated employee manager successfully');
+        console.log('\x1b[32m', 'Successfully updated employee manager', '\x1b[0m');
     } catch (err) {
-        console.error('Error updating employee manager:', err);
+        console.error('\x1b[31m', 'Error updating employee manager:', err.message, '\x1b[0m');
     }
 }
 
-// All delete functions
+// Enhanced delete functions
 async function deleteDepartment() {
     try {
-        const departments = await pool.query('SELECT * FROM department');
+        const departments = await pool.query('SELECT * FROM department ORDER BY name');
         
+        if (departments.rows.length === 0) {
+            console.log('\x1b[33m', 'No departments exist to delete.', '\x1b[0m');
+            return;
+        }
+
         const { departmentId } = await inquirer.prompt([
             {
                 type: 'list',
@@ -378,60 +483,204 @@ async function deleteDepartment() {
             }
         ]);
 
+        // Check for existing roles in the department
+        const existingRoles = await pool.query(
+            'SELECT COUNT(*) FROM role WHERE department_id = $1',
+            [departmentId]
+        );
+
+        if (existingRoles.rows[0].count > 0) {
+            console.log(
+                '\x1b[31m',
+                `Error: Cannot delete department because it has ${existingRoles.rows[0].count} role(s) associated with it.`,
+                'Please delete or reassign these roles first.',
+                '\x1b[0m'
+            );
+            
+            // Show the roles in this department
+            const roles = await pool.query(
+                'SELECT title FROM role WHERE department_id = $1 ORDER BY title',
+                [departmentId]
+            );
+            console.log('\nRoles in this department:');
+            roles.rows.forEach(role => console.log(`- ${role.title}`));
+            return;
+        }
+
+        // Get department name for confirmation message
+        const departmentName = departments.rows.find(dept => dept.id === departmentId).name;
+
+        // Confirm deletion
+        const { confirmDelete } = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'confirmDelete',
+                message: `Are you sure you want to delete the department: ${departmentName}?`,
+                default: false
+            }
+        ]);
+
+        if (!confirmDelete) {
+            console.log('\x1b[33m', 'Deletion cancelled.', '\x1b[0m');
+            return;
+        }
+
         await pool.query('DELETE FROM department WHERE id = $1', [departmentId]);
-        console.log('Department deleted successfully');
+        console.log('\x1b[32m', `Successfully deleted department: ${departmentName}`, '\x1b[0m');
     } catch (err) {
-        console.error('Error deleting department:', err);
+        console.error('\x1b[31m', 'Error deleting department:', err.message, '\x1b[0m');
     }
 }
 
 async function deleteRole() {
     try {
-        const roles = await pool.query('SELECT * FROM role');
+        const roles = await pool.query(`
+            SELECT r.id, r.title, d.name as department_name 
+            FROM role r 
+            JOIN department d ON r.department_id = d.id
+            ORDER BY r.title
+        `);
         
+        if (roles.rows.length === 0) {
+            console.log('\x1b[33m', 'No roles exist to delete.', '\x1b[0m');
+            return;
+        }
+
         const { roleId } = await inquirer.prompt([
             {
                 type: 'list',
                 name: 'roleId',
                 message: 'Which role do you want to delete?',
                 choices: roles.rows.map(role => ({
-                    name: role.title,
+                    name: `${role.title} (${role.department_name})`,
                     value: role.id
                 }))
             }
         ]);
 
+        // Check for existing employees in the role
+        const existingEmployees = await pool.query(
+            'SELECT COUNT(*) FROM employee WHERE role_id = $1',
+            [roleId]
+        );
+
+        if (existingEmployees.rows[0].count > 0) {
+            console.log(
+                '\x1b[31m',
+                `Error: Cannot delete role because it has ${existingEmployees.rows[0].count} employee(s) assigned to it.`,
+                'Please reassign or delete these employees first.',
+                '\x1b[0m'
+            );
+            
+            // Show the employees in this role
+            const employees = await pool.query(
+                'SELECT first_name, last_name FROM employee WHERE role_id = $1 ORDER BY last_name, first_name',
+                [roleId]
+            );
+            console.log('\nEmployees in this role:');
+            employees.rows.forEach(emp => 
+                console.log(`- ${emp.first_name} ${emp.last_name}`)
+            );
+            return;
+        }
+
+        // Get role name for confirmation message
+        const roleName = roles.rows.find(role => role.id === roleId).title;
+
+        // Confirm deletion
+        const { confirmDelete } = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'confirmDelete',
+                message: `Are you sure you want to delete the role: ${roleName}?`,
+                default: false
+            }
+        ]);
+
+        if (!confirmDelete) {
+            console.log('\x1b[33m', 'Deletion cancelled.', '\x1b[0m');
+            return;
+        }
+
         await pool.query('DELETE FROM role WHERE id = $1', [roleId]);
-        console.log('Role deleted successfully');
+        console.log('\x1b[32m', `Successfully deleted role: ${roleName}`, '\x1b[0m');
     } catch (err) {
-        console.error('Error deleting role:', err);
+        console.error('\x1b[31m', 'Error deleting role:', err.message, '\x1b[0m');
     }
 }
 
 async function deleteEmployee() {
     try {
-        const employees = await pool.query('SELECT * FROM employee');
+        const employees = await pool.query(`
+            SELECT 
+                e.id, 
+                e.first_name,
+                e.last_name,
+                r.title,
+                d.name as department_name
+            FROM employee e
+            JOIN role r ON e.role_id = r.id
+            JOIN department d ON r.department_id = d.id
+            ORDER BY e.last_name, e.first_name
+        `);
         
+        if (employees.rows.length === 0) {
+            console.log('\x1b[33m', 'No employees exist to delete.', '\x1b[0m');
+            return;
+        }
+
         const { employeeId } = await inquirer.prompt([
             {
                 type: 'list',
                 name: 'employeeId',
                 message: 'Which employee do you want to delete?',
                 choices: employees.rows.map(emp => ({
-                    name: `${emp.first_name} ${emp.last_name}`,
+                    name: `${emp.first_name} ${emp.last_name} (${emp.title} - ${emp.department_name})`,
                     value: emp.id
                 }))
             }
         ]);
 
+        // Check if employee is a manager
+        const managedEmployees = await pool.query(
+            'SELECT COUNT(*) FROM employee WHERE manager_id = $1',
+            [employeeId]
+        );
+
+        if (managedEmployees.rows[0].count > 0) {
+            console.log(
+                '\x1b[31m',
+                `Warning: This employee is a manager for ${managedEmployees.rows[0].count} employee(s).`,
+                'These employees will no longer have a manager assigned.',
+                '\x1b[0m'
+            );
+        }
+
+        const employeeName = `${employees.rows.find(emp => emp.id === employeeId).first_name} ${employees.rows.find(emp => emp.id === employeeId).last_name}`;
+
+        // Confirm deletion
+        const { confirmDelete } = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'confirmDelete',
+                message: `Are you sure you want to delete the employee: ${employeeName}?`,
+                default: false
+            }
+        ]);
+
+        if (!confirmDelete) {
+            console.log('\x1b[33m', 'Deletion cancelled.', '\x1b[0m');
+            return;
+        }
+
         await pool.query('DELETE FROM employee WHERE id = $1', [employeeId]);
-        console.log('Employee deleted successfully');
+        console.log('\x1b[32m', `Successfully deleted employee: ${employeeName}`, '\x1b[0m');
     } catch (err) {
-        console.error('Error deleting employee:', err);
+        console.error('\x1b[31m', 'Error deleting employee:', err.message, '\x1b[0m');
     }
 }
 
-// Main menu function with all options
+// Main menu function
 async function mainMenu() {
     const { choice } = await inquirer.prompt([
         {
@@ -502,12 +751,14 @@ async function mainMenu() {
             await deleteEmployee();
             break;
         case 'Exit':
-            console.log('Goodbye!');
+            console.log('\x1b[32m', 'Goodbye!', '\x1b[0m');
             process.exit();
     }
     await mainMenu();
 }
 
 // Start the application
-console.log('Welcome to the Employee Management System!');
+console.log('\x1b[36m','╔═══════════════════════════════════════╗');
+console.log(' ║ Welcome to Employee Management System ║');
+console.log(' ╚═══════════════════════════════════════╝', '\x1b[0m');
 mainMenu().catch(console.error);

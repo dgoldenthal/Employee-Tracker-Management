@@ -1,7 +1,17 @@
-# Employee-Tracker-Management
+# Employee-Tracker-Management-System
 
 A command-line application to manage a company's employee database,
 built with Node.js, Inquirer, and PostgreSQL.
+
+# Table of Contents
+
+  • Features
+  • Installation
+  • Usage
+  • Database Schema
+  • Application Demo
+  • Technologies Used
+  • Error Handling
 
 # Features
 
@@ -12,10 +22,22 @@ built with Node.js, Inquirer, and PostgreSQL.
 * Delete departments, roles, and employees
 * View total utilized budget by department
 
+# Error Handling
+
+  • Prevents deletion of departments with existing roles
+  • Prevents deletion of roles with existing employees
+  • Validates duplicate department names
+  • Validates salary inputs
+  • Handles database connection errors
+  • Color-coded error messages
+
+
 # Installation
 
 1. Clone the repository
-2. Install dependencies:  npm install
+
+2. Install dependencies:  nnpm install inquirer@8.2.4 pg console.table
+
 3. Create PostgreSQL database:
 
       psql -U postgres
@@ -34,12 +56,15 @@ built with Node.js, Inquirer, and PostgreSQL.
 
   Start the application: node index.js
   Follow the interactive prompts to manage your employee database.
-
+  Use arrow keys to navigate through the menu options:
+   - View options
+   - Add options
+   - Update options
+   - Delete options
 
 # Video Walkthrough
 
-Click here to view the application walkthrough -
-
+View the application walkthrough -[https://youtu.be/DtCWffaBFJM]
 
 # Dependencies
 
